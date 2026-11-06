@@ -4,6 +4,11 @@
     <!-- Para el botón "Desinstalar" del menú de cada app -->
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
 
+    <!-- Límite de tiempo: cuenta atrás y volver a Freno al acabar -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
     <!-- Ver solo las apps que tienen icono de inicio (sin pedir acceso a todas las apps) -->
     <queries>
         <intent>
@@ -34,5 +39,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".LimitService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Limite de tiempo de uso elegido por el usuario" />
+        </service>
     </application>
 </manifest>

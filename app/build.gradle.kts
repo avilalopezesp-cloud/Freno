@@ -12,8 +12,8 @@ android {
         applicationId = "com.freno.launcher"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1"
+        versionCode = 2
+        versionName = "0.2"
     }
 
     // Clave fija para que cada APK nuevo se instale encima del anterior sin perder datos.

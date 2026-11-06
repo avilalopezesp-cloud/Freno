@@ -293,7 +293,9 @@ fun FrenoScreen(
     app: AppEntry,
     unbrake: Boolean,
     prefs: FrenoPrefs,
-    onOpen: () -> Unit,
+    canOverlay: Boolean,
+    onGrantOverlay: () -> Unit,
+    onOpen: (limited: Boolean) -> Unit,
     onDone: () -> Unit,
 ) {
     val stop = {
@@ -367,7 +369,19 @@ fun FrenoScreen(
             else -> {
                 T(Reasons[chosen ?: 0], 15, Quiet)
                 Spacer(Modifier.height(16.dp))
-                T("Abrir ${app.label}", 18, Ink, modifier = Modifier.padding(12.dp).tap { onOpen() })
+                if (canOverlay) {
+                    T(
+                        "Abrir ${app.label} · ${prefs.limitMinutes} min", 18, Ink,
+                        modifier = Modifier.padding(12.dp).tap { onOpen(true) },
+                    )
+                } else {
+                    T(
+                        "Para cerrar ${app.label} al acabar el tiempo, Freno necesita el permiso «Mostrar sobre otras apps».",
+                        14, Quiet, center = true,
+                    )
+                    T("Dar permiso", 18, Ink, modifier = Modifier.padding(12.dp).tap { onGrantOverlay() })
+                    T("Abrir sin límite", 15, Dim, modifier = Modifier.padding(8.dp).tap { onOpen(false) })
+                }
             }
         }
 
@@ -375,6 +389,26 @@ fun FrenoScreen(
         if (!unbrake) {
             T("Mejor no", 17, Ink, FontWeight.Medium, modifier = Modifier.padding(16.dp).tap { stop() })
         }
+    }
+}
+
+// ============ TIEMPO ACABADO ============
+@Composable
+fun TimeUpScreen(label: String, minutes: Int, onDone: () -> Unit) {
+    BackHandler { onDone() }
+    Column(
+        Modifier
+            .fillMaxSize()
+            .systemBarsPadding()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        T("$minutes min", 48, Ink, FontWeight.Light)
+        Spacer(Modifier.height(12.dp))
+        T("Se acabó el tiempo de $label.", 18, Quiet, center = true)
+        Spacer(Modifier.height(48.dp))
+        T("Volver al inicio", 18, Ink, FontWeight.Medium, modifier = Modifier.padding(16.dp).tap { onDone() })
     }
 }
 
@@ -429,6 +463,20 @@ fun SettingsScreen(
             }
         }
 
+        Section("Tiempo por apertura")
+        Row {
+            listOf(5, 10, 15, 20).forEach { m ->
+                val on = prefs.limitMinutes == m
+                T(
+                    "$m min", 17,
+                    if (on) Ink else Dim,
+                    if (on) FontWeight.Medium else FontWeight.Normal,
+                    modifier = Modifier.padding(end = 20.dp, top = 4.dp, bottom = 4.dp).tap { prefs.setLimit(m) },
+                )
+            }
+        }
+        T("Al acabar, Freno vuelve al inicio.", 12, Dim)
+
         Section("Apps con freno")
         if (braked.isEmpty()) T("Ninguna", 15, Dim)
         braked.forEach { app ->
@@ -447,6 +495,6 @@ fun SettingsScreen(
         T("Cambiar app de inicio", 17, Ink, modifier = Modifier.padding(vertical = 8.dp).tap { onHomeSettings() })
 
         Spacer(Modifier.height(40.dp))
-        T("Freno 0.1", 12, Dim)
+        T("Freno 0.2", 12, Dim)
     }
 }

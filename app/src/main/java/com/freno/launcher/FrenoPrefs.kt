@@ -36,7 +36,14 @@ class FrenoPrefs(context: Context) {
         private set
     var waitSeconds by mutableIntStateOf(sp.getInt("wait", 8))
         private set
+    var limitMinutes by mutableIntStateOf(sp.getInt("limit", 10))
+        private set
     private var statsVersion by mutableIntStateOf(0)
+
+    fun setLimit(minutes: Int) {
+        limitMinutes = minutes
+        sp.edit().putInt("limit", minutes).apply()
+    }
 
     fun toggleFavorite(pkg: String) {
         favorites = if (pkg in favorites) favorites - pkg else favorites + pkg

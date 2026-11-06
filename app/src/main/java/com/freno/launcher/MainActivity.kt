@@ -26,6 +26,7 @@ sealed interface Screen {
     data object Drawer : Screen
     data object Ajustes : Screen
     data class Freno(val app: AppEntry, val unbrake: Boolean, val back: Screen = Home) : Screen
+    data class TimeUp(val label: String, val minutes: Int) : Screen
 }
 
 class MainActivity : ComponentActivity() {
@@ -33,6 +34,7 @@ class MainActivity : ComponentActivity() {
     private var apps by mutableStateOf<List<AppEntry>>(emptyList())
     private var screen by mutableStateOf<Screen>(Screen.Home)
     private var menuApp by mutableStateOf<AppEntry?>(null)
+    private var canOverlay by mutableStateOf(false)
 
     // Refresca la lista cuando se instala o desinstala una app
     private val packageReceiver = object : BroadcastReceiver() {
@@ -57,6 +59,7 @@ class MainActivity : ComponentActivity() {
             addDataScheme("package")
         }
         ContextCompat.registerReceiver(this, packageReceiver, filter, ContextCompat.RECEIVER_EXPORTED)
+        handleTimeUp(intent)
 
         setContent {
             Box(Modifier.fillMaxSize().background(Color.Black)) {
@@ -87,11 +90,19 @@ class MainActivity : ComponentActivity() {
                         app = s.app,
                         unbrake = s.unbrake,
                         prefs = prefs,
-                        onOpen = {
+                        canOverlay = canOverlay,
+                        onGrantOverlay = ::requestOverlay,
+                        onOpen = { limited ->
+                            if (limited) LimitService.start(this@MainActivity, s.app.label, prefs.limitMinutes)
                             launchApp(this@MainActivity, s.app)
                             screen = Screen.Home
                         },
                         onDone = { screen = s.back },
+                    )
+                    is Screen.TimeUp -> TimeUpScreen(
+                        label = s.label,
+                        minutes = s.minutes,
+                        onDone = { screen = Screen.Home },
                     )
                 }
 
@@ -137,16 +148,33 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun requestOverlay() {
+        startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+    }
+
+    /** Freno vuelve al frente cuando se acaba el tiempo de una app. */
+    private fun handleTimeUp(intent: Intent?): Boolean {
+        val label = intent?.getStringExtra(LimitService.EXTRA_TIMEUP_LABEL) ?: return false
+        intent.removeExtra(LimitService.EXTRA_TIMEUP_LABEL)
+        menuApp = null
+        screen = Screen.TimeUp(label, intent.getIntExtra(LimitService.EXTRA_MINUTES, prefs.limitMinutes))
+        return true
+    }
+
     override fun onResume() {
         super.onResume()
         apps = loadApps(this)
+        canOverlay = Settings.canDrawOverlays(this)
+        // Has vuelto al inicio antes de tiempo: se cancela la cuenta atrás
+        LimitService.stop(this)
     }
 
     // Botón de inicio pulsado estando ya en Freno: volver a la pantalla principal
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        if (handleTimeUp(intent)) return
         menuApp = null
-        if (screen !is Screen.Freno) screen = Screen.Home
+        if (screen !is Screen.Freno && screen !is Screen.TimeUp) screen = Screen.Home
     }
 
     override fun onDestroy() {
