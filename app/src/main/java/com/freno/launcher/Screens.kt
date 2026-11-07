@@ -53,6 +53,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -72,7 +73,7 @@ val Dim = Color(0xFF555555)
 
 val Reasons = listOf("Aburrimiento", "Responder a alguien", "Publicar algo", "Costumbre")
 
-private val Spanish: Locale = Locale.forLanguageTag("es-ES")
+val Spanish: Locale = Locale.forLanguageTag("es-ES")
 
 @Composable
 fun T(
@@ -82,6 +83,7 @@ fun T(
     weight: FontWeight = FontWeight.Normal,
     modifier: Modifier = Modifier,
     center: Boolean = false,
+    mono: Boolean = false,
 ) {
     BasicText(
         text = text,
@@ -90,6 +92,7 @@ fun T(
             color = color,
             fontSize = size.sp,
             fontWeight = weight,
+            fontFamily = if (mono) FontFamily.Monospace else FontFamily.Default,
             textAlign = if (center) TextAlign.Center else TextAlign.Start,
         ),
     )
@@ -109,6 +112,16 @@ fun Modifier.tap(onLong: (() -> Unit)? = null, onClick: () -> Unit): Modifier =
 fun norm(s: String): String =
     Normalizer.normalize(s.trim().lowercase(), Normalizer.Form.NFD).replace(Regex("\\p{Mn}+"), "")
 
+/** 0 s → "0 min", 75 min → "1 h 15 min". */
+fun fmtTime(seconds: Int): String {
+    val m = seconds / 60
+    return when {
+        m < 60 -> "$m min"
+        m % 60 == 0 -> "${m / 60} h"
+        else -> "${m / 60} h ${m % 60} min"
+    }
+}
+
 // ============ INICIO ============
 @Composable
 fun HomeScreen(
@@ -118,6 +131,7 @@ fun HomeScreen(
     onMenu: (AppEntry) -> Unit,
     onDrawer: () -> Unit,
     onSettings: () -> Unit,
+    onStats: () -> Unit,
 ) {
     BackHandler(enabled = true) {} // en inicio, "atrás" no hace nada
 
@@ -135,6 +149,7 @@ fun HomeScreen(
         .replaceFirstChar { it.uppercase() }
     val favs = prefs.favorites.mapNotNull { p -> apps.firstOrNull { it.packageName == p } }
     val stopped = prefs.todayStopped()
+    val used = prefs.todaySeconds()
 
     Column(
         Modifier
@@ -175,7 +190,11 @@ fun HomeScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            T(if (stopped == 1) "Hoy: 1 frenada" else "Hoy: $stopped frenadas", 13, Dim)
+            val frenadas = if (stopped == 1) "1 frenada" else "$stopped frenadas"
+            T(
+                "Hoy: $frenadas · ${fmtTime(used)}", 13, Dim,
+                modifier = Modifier.padding(vertical = 8.dp).tap { onStats() },
+            )
             T("apps ↑", 13, Quiet, modifier = Modifier.padding(8.dp).tap { onDrawer() })
         }
     }
@@ -293,9 +312,9 @@ fun FrenoScreen(
     app: AppEntry,
     unbrake: Boolean,
     prefs: FrenoPrefs,
-    canOverlay: Boolean,
-    onGrantOverlay: () -> Unit,
-    onOpen: (limited: Boolean) -> Unit,
+    a11y: Boolean,
+    onEnableA11y: () -> Unit,
+    onOpen: () -> Unit,
     onDone: () -> Unit,
 ) {
     val stop = {
@@ -308,14 +327,14 @@ fun FrenoScreen(
         if (!unbrake) prefs.recordAttempt()
     }
 
-    var remaining by remember { mutableIntStateOf(prefs.waitSeconds) }
-    LaunchedEffect(Unit) {
+    var remaining by remember(app.packageName) { mutableIntStateOf(prefs.waitSeconds) }
+    LaunchedEffect(app.packageName) {
         while (remaining > 0) {
             delay(1_000)
             remaining--
         }
     }
-    var reason by remember { mutableStateOf<Int?>(null) }
+    var reason by remember(app.packageName) { mutableStateOf<Int?>(null) }
 
     val breath = rememberInfiniteTransition(label = "breath")
     val scale by breath.animateFloat(
@@ -367,20 +386,19 @@ fun FrenoScreen(
             }
 
             else -> {
-                T(Reasons[chosen ?: 0], 15, Quiet)
+                T(Reasons[chosen], 15, Quiet)
                 Spacer(Modifier.height(16.dp))
-                if (canOverlay) {
+                T(
+                    "Abrir ${app.label} · ${prefs.limitMinutes} min", 18, Ink,
+                    modifier = Modifier.padding(12.dp).tap { onOpen() },
+                )
+                if (!a11y) {
+                    Spacer(Modifier.height(8.dp))
                     T(
-                        "Abrir ${app.label} · ${prefs.limitMinutes} min", 18, Ink,
-                        modifier = Modifier.padding(12.dp).tap { onOpen(true) },
+                        "El límite de tiempo no funcionará hasta que actives Freno en Accesibilidad.",
+                        13, Dim, center = true,
                     )
-                } else {
-                    T(
-                        "Para cerrar ${app.label} al acabar el tiempo, Freno necesita el permiso «Mostrar sobre otras apps».",
-                        14, Quiet, center = true,
-                    )
-                    T("Dar permiso", 18, Ink, modifier = Modifier.padding(12.dp).tap { onGrantOverlay() })
-                    T("Abrir sin límite", 15, Dim, modifier = Modifier.padding(8.dp).tap { onOpen(false) })
+                    T("Activar", 15, Quiet, modifier = Modifier.padding(8.dp).tap { onEnableA11y() })
                 }
             }
         }
@@ -421,12 +439,32 @@ fun Section(title: String) {
 }
 
 @Composable
+fun Options(values: List<Int>, selected: Int, label: (Int) -> String, onPick: (Int) -> Unit) {
+    Row {
+        values.forEach { v ->
+            val on = v == selected
+            T(
+                label(v), 17,
+                if (on) Ink else Dim,
+                if (on) FontWeight.Medium else FontWeight.Normal,
+                modifier = Modifier.padding(end = 20.dp, top = 4.dp, bottom = 4.dp).tap { onPick(v) },
+            )
+        }
+    }
+}
+
+@Composable
 fun SettingsScreen(
     apps: List<AppEntry>,
     prefs: FrenoPrefs,
+    system: SystemState,
     onBack: () -> Unit,
     onUnbrake: (AppEntry) -> Unit,
     onHomeSettings: () -> Unit,
+    onA11ySettings: () -> Unit,
+    onAppInfo: () -> Unit,
+    onNudge: (Int) -> Unit,
+    onStats: () -> Unit,
 ) {
     BackHandler { onBack() }
 
@@ -444,38 +482,60 @@ fun SettingsScreen(
     ) {
         T("Ajustes", 28, Ink, FontWeight.Light)
 
-        Section("Hoy")
-        T("Intentos: ${prefs.todayAttempts()}    Frenadas: ${prefs.todayStopped()}", 16, Ink)
-        prefs.todayReasons().forEach { (i, n) ->
-            T("${Reasons[i]}: $n", 14, Quiet, modifier = Modifier.padding(top = 4.dp))
+        Section("Protección")
+        if (system.a11y) {
+            T("Activada", 17, Ink)
+            T("Freno ve cuándo abres una app con freno, desde donde sea.", 12, Dim)
+        } else {
+            T("Desactivada", 17, Ink)
+            T(
+                "Sin esto, puedes entrar a Instagram desde notificaciones o recientes sin pasar por el freno, " +
+                    "y el límite de tiempo no funciona.",
+                13, Quiet,
+            )
+            T("1. Activar Freno en Accesibilidad", 16, Ink, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp).tap { onA11ySettings() })
+            T(
+                "Si sale «Ajuste restringido»: abre Info de la app, pulsa ⋮ arriba a la derecha → " +
+                    "«Permitir ajustes restringidos», y vuelve a intentarlo.",
+                12, Dim,
+            )
+            T("Abrir Info de Freno", 15, Quiet, modifier = Modifier.padding(vertical = 8.dp).tap { onAppInfo() })
         }
+
+        Section("Estadísticas")
+        T("Ver semana y mes", 17, Ink, modifier = Modifier.padding(vertical = 4.dp).tap { onStats() })
 
         Section("Espera del freno")
-        Row {
-            listOf(5, 8, 12, 20).forEach { s ->
-                val on = prefs.waitSeconds == s
-                T(
-                    "$s s", 17,
-                    if (on) Ink else Dim,
-                    if (on) FontWeight.Medium else FontWeight.Normal,
-                    modifier = Modifier.padding(end = 24.dp, top = 4.dp, bottom = 4.dp).tap { prefs.setWait(s) },
-                )
-            }
-        }
+        Options(listOf(5, 8, 12, 20), prefs.waitSeconds, { "$it s" }) { prefs.setWait(it) }
 
         Section("Tiempo por apertura")
-        Row {
-            listOf(5, 10, 15, 20).forEach { m ->
-                val on = prefs.limitMinutes == m
-                T(
-                    "$m min", 17,
-                    if (on) Ink else Dim,
-                    if (on) FontWeight.Medium else FontWeight.Normal,
-                    modifier = Modifier.padding(end = 20.dp, top = 4.dp, bottom = 4.dp).tap { prefs.setLimit(m) },
-                )
-            }
+        Options(listOf(5, 10, 15, 20), prefs.limitMinutes, { "$it min" }) { prefs.setLimit(it) }
+        T("Al acabar, Freno te devuelve al inicio.", 12, Dim)
+
+        Section("Avisos mientras la usas")
+        Options(listOf(0, 3, 5, 10), prefs.nudgeMinutes, { if (it == 0) "No" else "$it min" }) { onNudge(it) }
+        T("Vibra y te dice cuánto llevas, cada vez que pasa ese tiempo.", 12, Dim)
+        if (prefs.nudgeMinutes > 0 && !system.notifications) {
+            T("Las notificaciones están desactivadas: solo vibrará.", 12, Dim)
         }
-        T("Al acabar, Freno vuelve al inicio.", 12, Dim)
+
+        Section("Blanco y negro")
+        Options(listOf(0, 1), if (prefs.grayscale) 1 else 0, { if (it == 1) "Sí" else "No" }) {
+            prefs.setGrayscale(it == 1)
+        }
+        T("La pantalla se pone en gris mientras usas una app con freno.", 12, Dim)
+        if (!system.grayPermission) {
+            Spacer(Modifier.height(8.dp))
+            T(
+                "Necesita un permiso que Android solo deja dar desde un ordenador, una vez. " +
+                    "Con el móvil conectado al Mac y la depuración USB activada, ejecuta:",
+                13, Quiet,
+            )
+            T(
+                "adb shell pm grant com.freno.launcher android.permission.WRITE_SECURE_SETTINGS",
+                12, Ink, mono = true, modifier = Modifier.padding(vertical = 8.dp),
+            )
+        }
 
         Section("Apps con freno")
         if (braked.isEmpty()) T("Ninguna", 15, Dim)
@@ -495,6 +555,6 @@ fun SettingsScreen(
         T("Cambiar app de inicio", 17, Ink, modifier = Modifier.padding(vertical = 8.dp).tap { onHomeSettings() })
 
         Spacer(Modifier.height(40.dp))
-        T("Freno 0.2", 12, Dim)
+        T("Freno 0.3", 12, Dim)
     }
 }

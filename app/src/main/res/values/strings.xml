@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="a11y_description">Freno solo mira qué app está abierta. Así puede poner la pausa aunque abras una red social desde una notificación o desde recientes, contar el tiempo de uso y sacarte cuando se acaba el tiempo. No lee lo que escribes ni el contenido de las apps, y nada sale del móvil.</string>
+</resources>

@@ -1,6 +1,7 @@
 package com.freno.launcher
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -16,14 +17,26 @@ val DefaultBraked = setOf(
     "com.facebook.lite",          // Facebook Lite
 )
 
-/** Ajustes y estadísticas, guardados solo en el móvil. */
-class FrenoPrefs(context: Context) {
-    private val sp = context.getSharedPreferences("freno", Context.MODE_PRIVATE)
+data class DayStats(
+    val date: LocalDate,
+    val seconds: Map<String, Int>,
+    val opens: Map<String, Int>,
+    val attempts: Int,
+    val stopped: Int,
+    val reasons: Map<Int, Int>,
+) {
+    val totalSeconds: Int get() = seconds.values.sum()
+}
+
+/** Ajustes y estadísticas, guardados solo en el móvil. Una única instancia para la app y el servicio. */
+class FrenoPrefs private constructor(context: Context) {
+    private val sp = context.applicationContext.getSharedPreferences("freno", Context.MODE_PRIVATE)
 
     init {
         if (!sp.getBoolean("init", false)) {
             sp.edit().putStringSet("braked", DefaultBraked).putBoolean("init", true).apply()
         }
+        prune()
     }
 
     var favorites by mutableStateOf(
@@ -38,12 +51,18 @@ class FrenoPrefs(context: Context) {
         private set
     var limitMinutes by mutableIntStateOf(sp.getInt("limit", 10))
         private set
-    private var statsVersion by mutableIntStateOf(0)
+    /** Cada cuántos minutos avisar (vibración + notificación) mientras usas una app con freno. 0 = nunca. */
+    var nudgeMinutes by mutableIntStateOf(sp.getInt("nudge", 5))
+        private set
+    /** Blanco y negro mientras usas una app con freno. */
+    var grayscale by mutableStateOf(sp.getBoolean("gray", false))
+        private set
+    /** Si el blanco y negro lo activó Freno (para no apagar uno que pusiste tú). */
+    var grayActive: Boolean
+        get() = sp.getBoolean("gray_active", false)
+        set(v) { sp.edit().putBoolean("gray_active", v).apply() }
 
-    fun setLimit(minutes: Int) {
-        limitMinutes = minutes
-        sp.edit().putInt("limit", minutes).apply()
-    }
+    private var statsVersion by mutableIntStateOf(0)
 
     fun toggleFavorite(pkg: String) {
         favorites = if (pkg in favorites) favorites - pkg else favorites + pkg
@@ -65,31 +84,97 @@ class FrenoPrefs(context: Context) {
         sp.edit().putInt("wait", seconds).apply()
     }
 
-    // --- Estadísticas del día ---
+    fun setLimit(minutes: Int) {
+        limitMinutes = minutes
+        sp.edit().putInt("limit", minutes).apply()
+    }
+
+    fun setNudge(minutes: Int) {
+        nudgeMinutes = minutes
+        sp.edit().putInt("nudge", minutes).apply()
+    }
+
+    fun setGrayscale(on: Boolean) {
+        grayscale = on
+        sp.edit().putBoolean("gray", on).apply()
+    }
+
+    // --- Pases: una app con freno abierta pasando por la pausa, válida durante limitMinutes ---
+    private val passes = mutableMapOf<String, Long>()
+
+    fun grantPass(pkg: String) {
+        passes[pkg] = SystemClock.elapsedRealtime() + limitMinutes * 60_000L
+    }
+
+    fun passEnd(pkg: String): Long? = passes[pkg]
+    fun clearPass(pkg: String) {
+        passes.remove(pkg)
+    }
+
+    // --- Estadísticas ---
     private fun day() = LocalDate.now().toString()
 
-    private fun bump(key: String) {
-        sp.edit().putInt(key, sp.getInt(key, 0) + 1).apply()
+    private fun bump(key: String, by: Int = 1) {
+        sp.edit().putInt(key, sp.getInt(key, 0) + by).apply()
         statsVersion++
     }
 
     fun recordAttempt() = bump("att_${day()}")
     fun recordStopped() = bump("stop_${day()}")
     fun recordReason(index: Int) = bump("why_${day()}_$index")
-
-    fun todayAttempts(): Int {
-        statsVersion // para que la pantalla se actualice
-        return sp.getInt("att_${day()}", 0)
-    }
+    fun recordOpen(pkg: String) = bump("open_${day()}_$pkg")
+    fun addSeconds(pkg: String, seconds: Int) = bump("sec_${day()}_$pkg", seconds)
 
     fun todayStopped(): Int {
-        statsVersion
+        statsVersion // para que la pantalla se actualice
         return sp.getInt("stop_${day()}", 0)
     }
 
-    fun todayReasons(): Map<Int, Int> {
+    fun todaySeconds(): Int {
         statsVersion
-        val d = day()
-        return Reasons.indices.associateWith { sp.getInt("why_${d}_$it", 0) }.filterValues { it > 0 }
+        val prefix = "sec_${day()}_"
+        return sp.all.entries.filter { it.key.startsWith(prefix) }.sumOf { (it.value as? Int) ?: 0 }
+    }
+
+    /** Los últimos [n] días, del más antiguo a hoy. */
+    fun lastDays(n: Int): List<DayStats> {
+        statsVersion
+        val all = sp.all
+        val today = LocalDate.now()
+        return (n - 1 downTo 0).map { back ->
+            val d = today.minusDays(back.toLong())
+            val ds = d.toString()
+            fun perPkg(kind: String): Map<String, Int> {
+                val prefix = "${kind}_${ds}_"
+                return all.filterKeys { it.startsWith(prefix) }
+                    .map { it.key.removePrefix(prefix) to ((it.value as? Int) ?: 0) }
+                    .toMap()
+            }
+            DayStats(
+                date = d,
+                seconds = perPkg("sec"),
+                opens = perPkg("open"),
+                attempts = (all["att_$ds"] as? Int) ?: 0,
+                stopped = (all["stop_$ds"] as? Int) ?: 0,
+                reasons = Reasons.indices.associateWith { (all["why_${ds}_$it"] as? Int) ?: 0 }.filterValues { it > 0 },
+            )
+        }
+    }
+
+    /** Borra estadísticas de hace más de 120 días. */
+    private fun prune() {
+        val limit = LocalDate.now().minusDays(120)
+        val re = Regex("^(sec|open|att|stop|why)_(\\d{4}-\\d{2}-\\d{2}).*")
+        val old = sp.all.keys.filter { k ->
+            val m = re.matchEntire(k) ?: return@filter false
+            runCatching { LocalDate.parse(m.groupValues[2]) < limit }.getOrDefault(false)
+        }
+        if (old.isNotEmpty()) sp.edit().apply { old.forEach { remove(it) } }.apply()
+    }
+
+    companion object {
+        @Volatile private var instance: FrenoPrefs? = null
+        fun get(context: Context): FrenoPrefs =
+            instance ?: synchronized(this) { instance ?: FrenoPrefs(context).also { instance = it } }
     }
 }

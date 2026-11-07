@@ -37,7 +37,7 @@ jobs:
       # Publica el APK en "Releases" para descargarlo directo desde el móvil
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.2.${{ github.run_number }}
-          name: Freno 0.2 (build ${{ github.run_number }})
+          tag_name: v0.3.${{ github.run_number }}
+          name: Freno 0.3 (build ${{ github.run_number }})
           files: freno.apk
           make_latest: true
