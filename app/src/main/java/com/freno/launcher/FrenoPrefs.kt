@@ -94,7 +94,7 @@ class FrenoPrefs private constructor(context: Context) {
         sp.edit().putInt("nudge", minutes).apply()
     }
 
-    fun setGrayscale(on: Boolean) {
+    fun setGray(on: Boolean) {
         grayscale = on
         sp.edit().putBoolean("gray", on).apply()
     }

@@ -521,7 +521,7 @@ fun SettingsScreen(
 
         Section("Blanco y negro")
         Options(listOf(0, 1), if (prefs.grayscale) 1 else 0, { if (it == 1) "Sí" else "No" }) {
-            prefs.setGrayscale(it == 1)
+            prefs.setGray(it == 1)
         }
         T("La pantalla se pone en gris mientras usas una app con freno.", 12, Dim)
         if (!system.grayPermission) {
