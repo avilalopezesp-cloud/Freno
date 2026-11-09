@@ -335,6 +335,13 @@ fun FrenoScreen(
         }
     }
     var reason by remember(app.packageName) { mutableStateOf<Int?>(null) }
+    var launching by remember(app.packageName) { mutableStateOf(false) }
+    LaunchedEffect(launching) {
+        if (launching) {
+            delay(2_000)
+            onOpen()
+        }
+    }
 
     val breath = rememberInfiniteTransition(label = "breath")
     val scale by breath.animateFloat(
@@ -385,12 +392,20 @@ fun FrenoScreen(
                 }
             }
 
+            launching -> {
+                // Aviso antes de abrir: cuánto tiempo tienes
+                T("Tienes ${prefs.limitMinutes} min", 26, Ink, FontWeight.Light, center = true)
+                Spacer(Modifier.height(6.dp))
+                T("para usar ${app.label}", 15, Quiet, center = true)
+            }
+
             else -> {
                 T(Reasons[chosen], 15, Quiet)
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(24.dp))
+                // Discreto a propósito: que no invite a tocarlo sin pensar
                 T(
-                    "Abrir ${app.label} · ${prefs.limitMinutes} min", 18, Ink,
-                    modifier = Modifier.padding(12.dp).tap { onOpen() },
+                    "abrir ${app.label.lowercase()}", 14, Dim,
+                    modifier = Modifier.padding(12.dp).tap { launching = true },
                 )
                 if (!a11y) {
                     Spacer(Modifier.height(8.dp))
@@ -404,8 +419,8 @@ fun FrenoScreen(
         }
 
         Spacer(Modifier.weight(1f))
-        if (!unbrake) {
-            T("Mejor no", 17, Ink, FontWeight.Medium, modifier = Modifier.padding(16.dp).tap { stop() })
+        if (!unbrake && !launching) {
+            T("Mejor no", 20, Ink, FontWeight.Medium, modifier = Modifier.padding(16.dp).tap { stop() })
         }
     }
 }
@@ -537,6 +552,6 @@ fun SettingsScreen(
         T("Cambiar app de inicio", 17, Ink, modifier = Modifier.padding(vertical = 8.dp).tap { onHomeSettings() })
 
         Spacer(Modifier.height(40.dp))
-        T("Paraqué 0.4", 12, Dim)
+        T("Paraqué 0.5", 12, Dim)
     }
 }
