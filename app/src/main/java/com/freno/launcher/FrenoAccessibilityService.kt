@@ -27,7 +27,6 @@ import android.view.inputmethod.InputMethodManager
  * - Cuenta el tiempo real de uso.
  * - Avisa con vibración + notificación cada X minutos.
  * - Al acabar el tiempo pactado, te devuelve al inicio.
- * - Pone la pantalla en blanco y negro mientras usas esas apps (si tiene permiso).
  */
 class FrenoAccessibilityService : AccessibilityService() {
     private lateinit var prefs: FrenoPrefs
@@ -79,7 +78,6 @@ class FrenoAccessibilityService : AccessibilityService() {
         nudgesSent = 0
 
         val braked = pkg in prefs.braked
-        setGray(braked && prefs.grayscale)
         if (!braked) return
 
         val end = prefs.passEnd(pkg)
@@ -188,13 +186,10 @@ class FrenoAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun setGray(on: Boolean) = Grayscale.set(this, prefs, on)
-
     override fun onInterrupt() {}
 
     override fun onUnbind(intent: Intent?): Boolean {
         handler.removeCallbacks(ticker)
-        if (::prefs.isInitialized) setGray(false)
         return super.onUnbind(intent)
     }
 
@@ -209,30 +204,6 @@ class FrenoAccessibilityService : AccessibilityService() {
             val list = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
                 .orEmpty()
             return list.split(':').any { it.equals(me, ignoreCase = true) }
-        }
-    }
-}
-
-/** Blanco y negro con la corrección de color del sistema. Necesita WRITE_SECURE_SETTINGS (se da una vez por adb). */
-object Grayscale {
-    private const val ENABLED = "accessibility_display_daltonizer_enabled"
-    private const val MODE = "accessibility_display_daltonizer"
-
-    fun canUse(context: Context) =
-        context.checkSelfPermission(Manifest.permission.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED
-
-    fun set(context: Context, prefs: FrenoPrefs, on: Boolean) {
-        if (!canUse(context)) return
-        val cr = context.contentResolver
-        runCatching {
-            if (on) {
-                Settings.Secure.putInt(cr, MODE, 0) // 0 = monocromo
-                Settings.Secure.putInt(cr, ENABLED, 1)
-                prefs.grayActive = true
-            } else if (prefs.grayActive) {
-                Settings.Secure.putInt(cr, ENABLED, 0)
-                prefs.grayActive = false
-            }
         }
     }
 }

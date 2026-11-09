@@ -38,7 +38,6 @@ sealed interface Screen {
 data class SystemState(
     val a11y: Boolean = false,
     val notifications: Boolean = true,
-    val grayPermission: Boolean = false,
 )
 
 class MainActivity : ComponentActivity() {
@@ -194,7 +193,6 @@ class MainActivity : ComponentActivity() {
             a11y = FrenoAccessibilityService.isEnabled(this),
             notifications = Build.VERSION.SDK_INT < 33 ||
                 checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED,
-            grayPermission = Grayscale.canUse(this),
         )
     }
 

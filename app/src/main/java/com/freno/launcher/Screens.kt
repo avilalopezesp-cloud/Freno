@@ -395,7 +395,7 @@ fun FrenoScreen(
                 if (!a11y) {
                     Spacer(Modifier.height(8.dp))
                     T(
-                        "El límite de tiempo no funcionará hasta que actives Freno en Accesibilidad.",
+                        "El límite de tiempo no funcionará hasta que actives Paraqué en Accesibilidad.",
                         13, Dim, center = true,
                     )
                     T("Activar", 15, Quiet, modifier = Modifier.padding(8.dp).tap { onEnableA11y() })
@@ -485,7 +485,7 @@ fun SettingsScreen(
         Section("Protección")
         if (system.a11y) {
             T("Activada", 17, Ink)
-            T("Freno ve cuándo abres una app con freno, desde donde sea.", 12, Dim)
+            T("Paraqué ve cuándo abres una app con freno, desde donde sea.", 12, Dim)
         } else {
             T("Desactivada", 17, Ink)
             T(
@@ -493,13 +493,13 @@ fun SettingsScreen(
                     "y el límite de tiempo no funciona.",
                 13, Quiet,
             )
-            T("1. Activar Freno en Accesibilidad", 16, Ink, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp).tap { onA11ySettings() })
+            T("Activar Paraqué en Accesibilidad", 16, Ink, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp).tap { onA11ySettings() })
             T(
                 "Si sale «Ajuste restringido»: abre Info de la app, pulsa ⋮ arriba a la derecha → " +
                     "«Permitir ajustes restringidos», y vuelve a intentarlo.",
                 12, Dim,
             )
-            T("Abrir Info de Freno", 15, Quiet, modifier = Modifier.padding(vertical = 8.dp).tap { onAppInfo() })
+            T("Abrir Info de Paraqué", 15, Quiet, modifier = Modifier.padding(vertical = 8.dp).tap { onAppInfo() })
         }
 
         Section("Estadísticas")
@@ -510,31 +510,13 @@ fun SettingsScreen(
 
         Section("Tiempo por apertura")
         Options(listOf(5, 10, 15, 20), prefs.limitMinutes, { "$it min" }) { prefs.setLimit(it) }
-        T("Al acabar, Freno te devuelve al inicio.", 12, Dim)
+        T("Al acabar, Paraqué te devuelve al inicio.", 12, Dim)
 
         Section("Avisos mientras la usas")
         Options(listOf(0, 3, 5, 10), prefs.nudgeMinutes, { if (it == 0) "No" else "$it min" }) { onNudge(it) }
         T("Vibra y te dice cuánto llevas, cada vez que pasa ese tiempo.", 12, Dim)
         if (prefs.nudgeMinutes > 0 && !system.notifications) {
             T("Las notificaciones están desactivadas: solo vibrará.", 12, Dim)
-        }
-
-        Section("Blanco y negro")
-        Options(listOf(0, 1), if (prefs.grayscale) 1 else 0, { if (it == 1) "Sí" else "No" }) {
-            prefs.setGray(it == 1)
-        }
-        T("La pantalla se pone en gris mientras usas una app con freno.", 12, Dim)
-        if (!system.grayPermission) {
-            Spacer(Modifier.height(8.dp))
-            T(
-                "Necesita un permiso que Android solo deja dar desde un ordenador, una vez. " +
-                    "Con el móvil conectado al Mac y la depuración USB activada, ejecuta:",
-                13, Quiet,
-            )
-            T(
-                "adb shell pm grant com.freno.launcher android.permission.WRITE_SECURE_SETTINGS",
-                12, Ink, mono = true, modifier = Modifier.padding(vertical = 8.dp),
-            )
         }
 
         Section("Apps con freno")
@@ -555,6 +537,6 @@ fun SettingsScreen(
         T("Cambiar app de inicio", 17, Ink, modifier = Modifier.padding(vertical = 8.dp).tap { onHomeSettings() })
 
         Spacer(Modifier.height(40.dp))
-        T("Freno 0.3", 12, Dim)
+        T("Paraqué 0.4", 12, Dim)
     }
 }

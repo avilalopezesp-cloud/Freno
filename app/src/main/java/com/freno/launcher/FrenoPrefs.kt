@@ -54,14 +54,6 @@ class FrenoPrefs private constructor(context: Context) {
     /** Cada cuántos minutos avisar (vibración + notificación) mientras usas una app con freno. 0 = nunca. */
     var nudgeMinutes by mutableIntStateOf(sp.getInt("nudge", 5))
         private set
-    /** Blanco y negro mientras usas una app con freno. */
-    var grayscale by mutableStateOf(sp.getBoolean("gray", false))
-        private set
-    /** Si el blanco y negro lo activó Freno (para no apagar uno que pusiste tú). */
-    var grayActive: Boolean
-        get() = sp.getBoolean("gray_active", false)
-        set(v) { sp.edit().putBoolean("gray_active", v).apply() }
-
     private var statsVersion by mutableIntStateOf(0)
 
     fun toggleFavorite(pkg: String) {
@@ -92,11 +84,6 @@ class FrenoPrefs private constructor(context: Context) {
     fun setNudge(minutes: Int) {
         nudgeMinutes = minutes
         sp.edit().putInt("nudge", minutes).apply()
-    }
-
-    fun setGray(on: Boolean) {
-        grayscale = on
-        sp.edit().putBoolean("gray", on).apply()
     }
 
     // --- Pases: una app con freno abierta pasando por la pausa, válida durante limitMinutes ---
