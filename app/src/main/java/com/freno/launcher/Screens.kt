@@ -401,12 +401,8 @@ fun FrenoScreen(
 
             else -> {
                 T(Reasons[chosen], 15, Quiet)
-                Spacer(Modifier.height(24.dp))
-                // Discreto a propósito: que no invite a tocarlo sin pensar
-                T(
-                    "abrir ${app.label.lowercase()}", 14, Dim,
-                    modifier = Modifier.padding(12.dp).tap { launching = true },
-                )
+                Spacer(Modifier.height(20.dp))
+                T("Mejor no", 22, Ink, FontWeight.Medium, modifier = Modifier.padding(16.dp).tap { stop() })
                 if (!a11y) {
                     Spacer(Modifier.height(8.dp))
                     T(
@@ -419,7 +415,13 @@ fun FrenoScreen(
         }
 
         Spacer(Modifier.weight(1f))
-        if (!unbrake && !launching) {
+        if (!unbrake && !launching && chosen != null && remaining == 0) {
+            // Abajo y discreto a propósito: que no invite a tocarlo sin pensar
+            T(
+                "abrir ${app.label.lowercase()}", 14, Dim,
+                modifier = Modifier.padding(16.dp).tap { launching = true },
+            )
+        } else if (!unbrake && !launching) {
             T("Mejor no", 20, Ink, FontWeight.Medium, modifier = Modifier.padding(16.dp).tap { stop() })
         }
     }
@@ -501,6 +503,7 @@ fun SettingsScreen(
         if (system.a11y) {
             T("Activada", 17, Ink)
             T("Paraqué ve cuándo abres una app con freno, desde donde sea.", 12, Dim)
+            if (prefs.lastSeen.isNotEmpty()) T("Última app detectada: ${prefs.lastSeen}", 12, Quiet)
         } else {
             T("Desactivada", 17, Ink)
             T(
@@ -552,6 +555,6 @@ fun SettingsScreen(
         T("Cambiar app de inicio", 17, Ink, modifier = Modifier.padding(vertical = 8.dp).tap { onHomeSettings() })
 
         Spacer(Modifier.height(40.dp))
-        T("Paraqué 0.5", 12, Dim)
+        T("Paraqué 0.6", 12, Dim)
     }
 }

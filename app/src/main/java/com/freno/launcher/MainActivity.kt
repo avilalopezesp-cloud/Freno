@@ -18,6 +18,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -77,6 +78,16 @@ class MainActivity : ComponentActivity() {
         handleExtras(intent)
 
         setContent {
+            val pending = prefs.pending
+            LaunchedEffect(pending) {
+                if (pending != null) {
+                    prefs.pending = null
+                    val (kind, pkg) = pending
+                    menuApp = null
+                    screen = if (kind == "timeup") Screen.TimeUp(appFor(pkg).label, prefs.limitMinutes)
+                    else Screen.Freno(appFor(pkg), unbrake = false)
+                }
+            }
             Box(Modifier.fillMaxSize().background(Color.Black)) {
                 when (val s = screen) {
                     Screen.Home -> HomeScreen(
@@ -230,7 +241,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         if (handleExtras(intent)) return
         menuApp = null
-        if (screen !is Screen.Freno && screen !is Screen.TimeUp) screen = Screen.Home
+        if (prefs.pending == null && screen !is Screen.Freno && screen !is Screen.TimeUp) screen = Screen.Home
     }
 
     override fun onDestroy() {

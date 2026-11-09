@@ -37,7 +37,7 @@ jobs:
       # Publica el APK en "Releases" para descargarlo directo desde el móvil
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.5.${{ github.run_number }}
-          name: Paraqué 0.5 (build ${{ github.run_number }})
+          tag_name: v0.6.${{ github.run_number }}
+          name: Paraqué 0.6 (build ${{ github.run_number }})
           files: freno.apk
           make_latest: true

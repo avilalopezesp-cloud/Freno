@@ -56,6 +56,11 @@ class FrenoPrefs private constructor(context: Context) {
         private set
     private var statsVersion by mutableIntStateOf(0)
 
+    /** Lo que el servicio pide mostrar: ("brake" | "timeup") a paquete. Lo recoge MainActivity. */
+    var pending by mutableStateOf<Pair<String, String>?>(null)
+    /** Última app que vio el servicio (para comprobar que funciona). */
+    var lastSeen by mutableStateOf("")
+
     fun toggleFavorite(pkg: String) {
         favorites = if (pkg in favorites) favorites - pkg else favorites + pkg
         sp.edit().putString("favorites", favorites.joinToString("|")).apply()

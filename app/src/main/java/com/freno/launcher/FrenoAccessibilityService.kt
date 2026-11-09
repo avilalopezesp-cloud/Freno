@@ -67,6 +67,7 @@ class FrenoAccessibilityService : AccessibilityService() {
         if (pkg in ignored) return
         if (event.className?.toString().orEmpty().contains("Toast")) return
         if (pkg == current) return
+        if (pkg != packageName) prefs.lastSeen = label(pkg)
         onForeground(pkg)
     }
 
@@ -128,26 +129,26 @@ class FrenoAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun showFreno(pkg: String) {
-        startActivity(
-            Intent(this, MainActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                .putExtra(EXTRA_BRAKE_PKG, pkg)
-        )
+    private fun showFreno(pkg: String) = bringBack("brake", pkg)
+
+    /** Te devuelve a Paraqué: botón de inicio + abrir la app. La pantalla recoge el aviso pendiente. */
+    private fun bringBack(kind: String, pkg: String) {
+        prefs.pending = kind to pkg
+        performGlobalAction(GLOBAL_ACTION_HOME)
+        handler.postDelayed({
+            runCatching {
+                startActivity(
+                    Intent(this, MainActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                )
+            }
+        }, 250)
     }
 
     private fun timeUp(pkg: String) {
         prefs.clearPass(pkg)
         vibrate(longArrayOf(0, 200, 120, 200))
-        try {
-            startActivity(
-                Intent(this, MainActivity::class.java)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    .putExtra(EXTRA_TIMEUP_PKG, pkg)
-            )
-        } catch (e: Exception) {
-            performGlobalAction(GLOBAL_ACTION_HOME)
-        }
+        bringBack("timeup", pkg)
     }
 
     private fun label(pkg: String): String = runCatching {
