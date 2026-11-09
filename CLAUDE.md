@@ -11,5 +11,5 @@ App Android que pone una pausa antes de abrir redes sociales. Funciona como pant
 
 ## Compilar y probar
 - Android Studio: abrir la carpeta, elegir un emulador o el móvil por USB y pulsar Run.
-- Terminal: `./gradlew installDebug` (o `gradle installDebug`) con el emulador abierto.
+- Terminal: `./gradlew installDebug` con el emulador abierto o el móvil conectado. Si aún no existe `gradlew`, crearlo una vez con `gradle wrapper --gradle-version 8.11.1` (Android Studio también lo resuelve al sincronizar).
 - Cada push a `main` compila en GitHub Actions y publica `freno.apk` en Releases.
