@@ -119,14 +119,7 @@ class FrenoAccessibilityService : AccessibilityService() {
             return
         }
 
-        val every = prefs.nudgeMinutes
-        if (every > 0) {
-            val due = sessionSeconds / 60 / every
-            if (due > nudgesSent) {
-                nudgesSent = due
-                nudge(pkg, sessionSeconds / 60)
-            }
-        }
+        prefs.nudgeDue()?.let { minutes -> nudge(minutes) }
     }
 
     private fun showFreno(pkg: String) = bringBack("brake", pkg)
@@ -155,7 +148,7 @@ class FrenoAccessibilityService : AccessibilityService() {
         packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
     }.getOrDefault(pkg)
 
-    private fun nudge(pkg: String, minutes: Int) {
+    private fun nudge(minutes: Int) {
         vibrate(longArrayOf(0, 120, 100, 120))
         if (Build.VERSION.SDK_INT >= 33 &&
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
@@ -168,7 +161,7 @@ class FrenoAccessibilityService : AccessibilityService() {
         }
         val n = Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle("Llevas $minutes min en ${label(pkg)}")
+            .setContentTitle("Hoy llevas ${fmtTime(minutes * 60)} en redes")
             .setTimeoutAfter(60_000)
             .setAutoCancel(true)
             .build()

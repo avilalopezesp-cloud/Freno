@@ -327,7 +327,10 @@ fun FrenoScreen(
         if (!unbrake) prefs.recordAttempt()
     }
 
-    var remaining by remember(app.packageName) { mutableIntStateOf(prefs.waitSeconds) }
+    // Calculada antes de contar este intento
+    var remaining by remember(app.packageName) { mutableIntStateOf(if (unbrake) prefs.waitSeconds else prefs.waitForNext()) }
+    // Los motivos cambian de orden cada vez, para que no se toquen sin leer
+    val order = remember(app.packageName) { Reasons.indices.shuffled() }
     LaunchedEffect(app.packageName) {
         while (remaining > 0) {
             delay(1_000)
@@ -360,6 +363,18 @@ fun FrenoScreen(
     ) {
         Spacer(Modifier.height(24.dp))
         T(app.label, 15, Quiet)
+        if (!unbrake) {
+            // Siempre a la vista: cuánto llevas hoy
+            Spacer(Modifier.height(10.dp))
+            val opens = prefs.todayOpens()
+            T(
+                "Hoy: ${fmtTime(prefs.todaySeconds())} en redes · $opens ${if (opens == 1) "vez" else "veces"}",
+                14, Dim, center = true,
+            )
+            if (prefs.overBudget()) {
+                T("Has pasado tu límite de ${fmtTime(prefs.budgetMinutes * 60)} al día", 14, Quiet, center = true)
+            }
+        }
         Spacer(Modifier.weight(1f))
 
         Canvas(Modifier.size(200.dp)) {
@@ -384,8 +399,8 @@ fun FrenoScreen(
             chosen == null -> {
                 T("¿Para qué la abres?", 20, Ink, center = true)
                 Spacer(Modifier.height(12.dp))
-                Reasons.forEachIndexed { i, r ->
-                    T(r, 17, Quiet, modifier = Modifier.padding(vertical = 10.dp).tap {
+                order.forEach { i ->
+                    T(Reasons[i], 17, Quiet, modifier = Modifier.padding(vertical = 10.dp).tap {
                         reason = i
                         prefs.recordReason(i)
                     })
@@ -530,9 +545,17 @@ fun SettingsScreen(
         Options(listOf(5, 10, 15, 20), prefs.limitMinutes, { "$it min" }) { prefs.setLimit(it) }
         T("Al acabar, Paraqué te devuelve al inicio.", 12, Dim)
 
-        Section("Avisos mientras la usas")
-        Options(listOf(0, 3, 5, 10), prefs.nudgeMinutes, { if (it == 0) "No" else "$it min" }) { onNudge(it) }
-        T("Vibra y te dice cuánto llevas, cada vez que pasa ese tiempo.", 12, Dim)
+        Section("Espera progresiva")
+        Options(listOf(1, 0), if (prefs.progressive) 1 else 0, { if (it == 1) "Sí" else "No" }) { prefs.setProgressive(it == 1) }
+        T("Cada intento del día espera 3 s más (hasta 30 s más).", 12, Dim)
+
+        Section("Límite diario")
+        Options(listOf(0, 30, 60, 120), prefs.budgetMinutes, { if (it == 0) "No" else fmtTime(it * 60) }) { prefs.setBudget(it) }
+        T("Al pasarlo, la pausa dura 15 s más y te lo recuerda.", 12, Dim)
+
+        Section("Avisos")
+        Options(listOf(0, 15, 30, 60), prefs.nudgeMinutes, { if (it == 0) "No" else fmtTime(it * 60) }) { onNudge(it) }
+        T("Vibra y te dice cuánto llevas hoy en redes, cada vez que sumas ese tiempo.", 12, Dim)
         if (prefs.nudgeMinutes > 0 && !system.notifications) {
             T("Las notificaciones están desactivadas: solo vibrará.", 12, Dim)
         }
@@ -555,6 +578,6 @@ fun SettingsScreen(
         T("Cambiar app de inicio", 17, Ink, modifier = Modifier.padding(vertical = 8.dp).tap { onHomeSettings() })
 
         Spacer(Modifier.height(40.dp))
-        T("Paraqué 0.6", 12, Dim)
+        T("Paraqué 0.7", 12, Dim)
     }
 }

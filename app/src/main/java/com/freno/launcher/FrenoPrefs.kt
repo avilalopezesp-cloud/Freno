@@ -51,8 +51,14 @@ class FrenoPrefs private constructor(context: Context) {
         private set
     var limitMinutes by mutableIntStateOf(sp.getInt("limit", 10))
         private set
-    /** Cada cuántos minutos avisar (vibración + notificación) mientras usas una app con freno. 0 = nunca. */
-    var nudgeMinutes by mutableIntStateOf(sp.getInt("nudge", 5))
+    /** Avisar (vibración + notificación) cada vez que el total del día suma estos minutos. 0 = nunca. */
+    var nudgeMinutes by mutableIntStateOf(sp.getInt("nudge_total", 30))
+        private set
+    /** La espera crece con cada intento del día. */
+    var progressive by mutableStateOf(sp.getBoolean("progressive", true))
+        private set
+    /** Tiempo al día en apps con freno; al pasarlo, la pausa es más larga. 0 = sin límite. */
+    var budgetMinutes by mutableIntStateOf(sp.getInt("budget", 60))
         private set
     private var statsVersion by mutableIntStateOf(0)
 
@@ -88,7 +94,41 @@ class FrenoPrefs private constructor(context: Context) {
 
     fun setNudge(minutes: Int) {
         nudgeMinutes = minutes
-        sp.edit().putInt("nudge", minutes).apply()
+        sp.edit().putInt("nudge_total", minutes).apply()
+    }
+
+    fun setProgressive(on: Boolean) {
+        progressive = on
+        sp.edit().putBoolean("progressive", on).apply()
+    }
+
+    fun setBudget(minutes: Int) {
+        budgetMinutes = minutes
+        sp.edit().putInt("budget", minutes).apply()
+    }
+
+    fun overBudget(): Boolean = budgetMinutes > 0 && todaySeconds() >= budgetMinutes * 60
+
+    /**
+     * Segundos de espera para el próximo intento: la base, +3 s por cada intento previo de hoy
+     * (hasta +30 s) si la espera progresiva está activa, y +15 s si ya pasaste el límite del día.
+     */
+    fun waitForNext(): Int {
+        var s = waitSeconds
+        if (progressive) s += minOf(todayAttempts() * 3, 30)
+        if (overBudget()) s += 15
+        return s
+    }
+
+    /** Si el total de hoy acaba de pasar un múltiplo de nudgeMinutes, devuelve los minutos de hoy; si no, null. */
+    fun nudgeDue(): Int? {
+        if (nudgeMinutes <= 0) return null
+        val total = todaySeconds() / 60
+        val mark = total / nudgeMinutes
+        val key = "nudged_${day()}"
+        if (mark <= sp.getInt(key, 0)) return null
+        sp.edit().putInt(key, mark).apply()
+        return total
     }
 
     // --- Pases: una app con freno abierta pasando por la pausa, válida durante limitMinutes ---
@@ -116,6 +156,17 @@ class FrenoPrefs private constructor(context: Context) {
     fun recordReason(index: Int) = bump("why_${day()}_$index")
     fun recordOpen(pkg: String) = bump("open_${day()}_$pkg")
     fun addSeconds(pkg: String, seconds: Int) = bump("sec_${day()}_$pkg", seconds)
+
+    fun todayAttempts(): Int {
+        statsVersion
+        return sp.getInt("att_${day()}", 0)
+    }
+
+    fun todayOpens(): Int {
+        statsVersion
+        val prefix = "open_${day()}_"
+        return sp.all.entries.filter { it.key.startsWith(prefix) }.sumOf { (it.value as? Int) ?: 0 }
+    }
 
     fun todayStopped(): Int {
         statsVersion // para que la pantalla se actualice
@@ -156,7 +207,7 @@ class FrenoPrefs private constructor(context: Context) {
     /** Borra estadísticas de hace más de 120 días. */
     private fun prune() {
         val limit = LocalDate.now().minusDays(120)
-        val re = Regex("^(sec|open|att|stop|why)_(\\d{4}-\\d{2}-\\d{2}).*")
+        val re = Regex("^(sec|open|att|stop|why|nudged)_(\\d{4}-\\d{2}-\\d{2}).*")
         val old = sp.all.keys.filter { k ->
             val m = re.matchEntire(k) ?: return@filter false
             runCatching { LocalDate.parse(m.groupValues[2]) < limit }.getOrDefault(false)
