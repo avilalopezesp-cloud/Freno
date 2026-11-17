@@ -546,7 +546,7 @@ fun SettingsScreen(
         T("Al acabar, Paraqué te devuelve al inicio.", 12, Dim)
 
         Section("Espera progresiva")
-        Options(listOf(1, 0), if (prefs.progressive) 1 else 0, { if (it == 1) "Sí" else "No" }) { prefs.setProgressive(it == 1) }
+        Options(listOf(1, 0), if (prefs.progressive) 1 else 0, { if (it == 1) "Sí" else "No" }) { prefs.setProgressiveWait(it == 1) }
         T("Cada intento del día espera 3 s más (hasta 30 s más).", 12, Dim)
 
         Section("Límite diario")

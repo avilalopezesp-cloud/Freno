@@ -97,7 +97,7 @@ class FrenoPrefs private constructor(context: Context) {
         sp.edit().putInt("nudge_total", minutes).apply()
     }
 
-    fun setProgressive(on: Boolean) {
+    fun setProgressiveWait(on: Boolean) {
         progressive = on
         sp.edit().putBoolean("progressive", on).apply()
     }
