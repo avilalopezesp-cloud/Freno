@@ -47,7 +47,8 @@ class FrenoPrefs private constructor(context: Context) {
         private set
     var hidden by mutableStateOf(sp.getStringSet("hidden", emptySet()).orEmpty().toSet())
         private set
-    var waitSeconds by mutableIntStateOf(sp.getInt("wait", 8))
+    /** Respiraciones guiadas de la pausa (cada una 8 s siguiendo el círculo con el dedo). */
+    var breaths by mutableIntStateOf(sp.getInt("breaths", 2))
         private set
     var limitMinutes by mutableIntStateOf(sp.getInt("limit", 10))
         private set
@@ -82,9 +83,9 @@ class FrenoPrefs private constructor(context: Context) {
         sp.edit().putStringSet("hidden", hidden).apply()
     }
 
-    fun setWait(seconds: Int) {
-        waitSeconds = seconds
-        sp.edit().putInt("wait", seconds).apply()
+    fun setBreathCount(n: Int) {
+        breaths = n
+        sp.edit().putInt("breaths", n).apply()
     }
 
     fun setLimit(minutes: Int) {
@@ -110,14 +111,14 @@ class FrenoPrefs private constructor(context: Context) {
     fun overBudget(): Boolean = budgetMinutes > 0 && todaySeconds() >= budgetMinutes * 60
 
     /**
-     * Segundos de espera para el próximo intento: la base, +3 s por cada intento previo de hoy
-     * (hasta +30 s) si la espera progresiva está activa, y +15 s si ya pasaste el límite del día.
+     * Respiraciones para el próximo intento: la base, +1 cada 3 intentos de hoy (hasta +3)
+     * si la espera progresiva está activa, y +1 si ya pasaste el límite del día.
      */
-    fun waitForNext(): Int {
-        var s = waitSeconds
-        if (progressive) s += minOf(todayAttempts() * 3, 30)
-        if (overBudget()) s += 15
-        return s
+    fun breathsForNext(): Int {
+        var n = breaths
+        if (progressive) n += minOf(todayAttempts() / 3, 3)
+        if (overBudget()) n += 1
+        return n
     }
 
     /** Si el total de hoy acaba de pasar un múltiplo de nudgeMinutes, devuelve los minutos de hoy; si no, null. */

@@ -327,16 +327,11 @@ fun FrenoScreen(
         if (!unbrake) prefs.recordAttempt()
     }
 
-    // Calculada antes de contar este intento
-    var remaining by remember(app.packageName) { mutableIntStateOf(if (unbrake) prefs.waitSeconds else prefs.waitForNext()) }
+    // Calculado antes de contar este intento
+    val needBreaths = remember(app.packageName) { if (unbrake) 2 else prefs.breathsForNext() }
+    var breathed by remember(app.packageName) { mutableStateOf(false) }
     // Los motivos cambian de orden cada vez, para que no se toquen sin leer
     val order = remember(app.packageName) { Reasons.indices.shuffled() }
-    LaunchedEffect(app.packageName) {
-        while (remaining > 0) {
-            delay(1_000)
-            remaining--
-        }
-    }
     var reason by remember(app.packageName) { mutableStateOf<Int?>(null) }
     var launching by remember(app.packageName) { mutableStateOf(false) }
     LaunchedEffect(launching) {
@@ -377,15 +372,16 @@ fun FrenoScreen(
         }
         Spacer(Modifier.weight(1f))
 
+        val chosen = reason
+        if (!breathed) {
+            BreathGuide(needBreaths) { breathed = true }
+        } else {
         Canvas(Modifier.size(200.dp)) {
             drawCircle(Ink, radius = size.minDimension / 2f * scale, style = Stroke(width = 2.dp.toPx()))
         }
         Spacer(Modifier.height(32.dp))
 
-        val chosen = reason
         when {
-            remaining > 0 -> T("Respira · $remaining", 16, Quiet)
-
             unbrake -> {
                 T("¿Quitar el freno a ${app.label}?", 20, Ink, center = true)
                 Spacer(Modifier.height(20.dp))
@@ -428,9 +424,10 @@ fun FrenoScreen(
                 }
             }
         }
+        }
 
         Spacer(Modifier.weight(1f))
-        if (!unbrake && !launching && chosen != null && remaining == 0) {
+        if (!unbrake && !launching && chosen != null && breathed) {
             // Abajo y discreto a propósito: que no invite a tocarlo sin pensar
             T(
                 "abrir ${app.label.lowercase()}", 14, Dim,
@@ -538,8 +535,9 @@ fun SettingsScreen(
         Section("Estadísticas")
         T("Ver semana y mes", 17, Ink, modifier = Modifier.padding(vertical = 4.dp).tap { onStats() })
 
-        Section("Espera del freno")
-        Options(listOf(5, 8, 12, 20), prefs.waitSeconds, { "$it s" }) { prefs.setWait(it) }
+        Section("Respiraciones de la pausa")
+        Options(listOf(1, 2, 3, 4), prefs.breaths, { "$it" }) { prefs.setBreathCount(it) }
+        T("Cada una son 8 s siguiendo el círculo con el dedo: sube al inhalar, baja al exhalar.", 12, Dim)
 
         Section("Tiempo por apertura")
         Options(listOf(5, 10, 15, 20), prefs.limitMinutes, { "$it min" }) { prefs.setLimit(it) }
@@ -547,11 +545,11 @@ fun SettingsScreen(
 
         Section("Espera progresiva")
         Options(listOf(1, 0), if (prefs.progressive) 1 else 0, { if (it == 1) "Sí" else "No" }) { prefs.setProgressiveWait(it == 1) }
-        T("Cada intento del día espera 3 s más (hasta 30 s más).", 12, Dim)
+        T("Cada 3 intentos del día, una respiración más (hasta 3 más).", 12, Dim)
 
         Section("Límite diario")
         Options(listOf(0, 30, 60, 120), prefs.budgetMinutes, { if (it == 0) "No" else fmtTime(it * 60) }) { prefs.setBudget(it) }
-        T("Al pasarlo, la pausa dura 15 s más y te lo recuerda.", 12, Dim)
+        T("Al pasarlo, una respiración más y te lo recuerda.", 12, Dim)
 
         Section("Avisos")
         Options(listOf(0, 15, 30, 60), prefs.nudgeMinutes, { if (it == 0) "No" else fmtTime(it * 60) }) { onNudge(it) }
@@ -578,6 +576,6 @@ fun SettingsScreen(
         T("Cambiar app de inicio", 17, Ink, modifier = Modifier.padding(vertical = 8.dp).tap { onHomeSettings() })
 
         Spacer(Modifier.height(40.dp))
-        T("Paraqué 0.7", 12, Dim)
+        T("Paraqué 0.8", 12, Dim)
     }
 }
